@@ -15,6 +15,12 @@ Installation for the following:
 *   Placeholder
 """
 
+pip install rdkit
+
+pip install datamol
+
+"""# Don't run the cell below"""
+
 !pip install --verbose --no-cache-dir torch-scatter
 !pip install --verbose --no-cache-dir torch-sparse
 !pip install --verbose --no-cache-dir torch-cluster
@@ -38,30 +44,79 @@ from sklearn.metrics import accuracy_score
 
 from rdkit import Chem
 from rdkit.Chem import PandasTools
+import datamol as dm
 
-# Using MolVS? or RDKit for molecular standardization for preprocessing
-
-# break bonds
-
-# neutralise
-
-# rules
-
-# tautomerism
-
-# re-run neutralisation
-
-# unsalt
-
-# return standardized parent
-
-# I kind of know the overall steps to standardizing molecules, but it's kind of unclear from all the resources I looked at so I'll ask about this during our session
-
-# Converting the sdf file from SMILES to df for Pandas
+# Converting the sdf file from SMILES to use as a df for Pandas
 
 # Idk if this will work on your end because I copied the file path from my Google Drive
-fn = '/content/tox21_10k_data_all.sdf'
+fn = '/content/drive/MyDrive/Helen Tran - Science Research 2024-2025/Data/tox21_10k_data_all.sdf'
 tox_df = PandasTools.LoadSDF(fn, embedProps = True, molColName = None, smilesName = 'smiles')
+
+# Using datamol + RDKit for molecular standardization for preprocessing
+
+smiles_column = "smiles"
+
+
+def _preprocess(row):
+    mol = dm.to_mol(row[smiles_column], ordered=True)
+    mol = dm.fix_mol(mol)
+    mol = dm.sanitize_mol(mol, sanifix=True, charge_neutral=False)
+    mol = dm.standardize_mol(
+        mol,
+        disconnect_metals=False,
+        normalize=True,
+        reionize=True,
+        uncharge=False,
+        stereo=True,
+    )
+
+    row["standard_smiles"] = dm.standardize_smiles(dm.to_smiles(mol))
+    row["selfies"] = dm.to_selfies(mol)
+    row["inchi"] = dm.to_inchi(mol)
+    row["inchikey"] = dm.to_inchikey(mol)
+    return row
+
+
+data_clean = tox_df.apply(_preprocess, axis=1)
+data_clean
+
+smiles_column = "smiles"
+
+
+def _preprocess(i, row):
+
+    dm.disable_rdkit_log()
+
+    mol = dm.to_mol(row[smiles_column], ordered=True)
+    mol = dm.fix_mol(mol)
+    mol = dm.sanitize_mol(mol, sanifix=True, charge_neutral=False)
+    mol = dm.standardize_mol(
+        mol, disconnect_metals=False, normalize=True, reionize=True, uncharge=False, stereo=True
+    )
+
+    row["standard_smiles"] = dm.standardize_smiles(dm.to_smiles(mol))
+    row["selfies"] = dm.to_selfies(mol)
+    row["inchi"] = dm.to_inchi(mol)
+    row["inchikey"] = dm.to_inchikey(mol)
+    return row
+
+
+data_clean = dm.parallelized(_preprocess, tox_df.iterrows(), arg_type="args", progress=True, total=len(tox_df))
+data_clean = pd.DataFrame(data_clean)
+data_clean
+
+print(tox_df)
+
+#NaN = unknown data/no data
+#0/1 = no interaction
+#remove all rows/columns with NaNs
+
+tox_df2 = tox_df[tox_df['NR-AR'].notna()]
+
+# tox_df['NR-AR'] just gives the values in a specific column
+# notna excludes all NaNs
+# pd.merge (df1, df2) merges the dfs together
+# pd.merge(df1,df2, on=‘Formula’) keeps the Formula column constant, but all the other columns are merged
 
 """# Logistic Regression Model (Baseline)"""
 
