@@ -1,4 +1,4 @@
-# ScienceResearch24
+# Drug Toxicity Classification With Graph Attention Networks
 
 This project is a machine learning model that classifies drugs based on their toxicity using a machine learning algorithm called graph attention networks.
 
